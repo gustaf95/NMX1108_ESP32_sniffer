@@ -528,7 +528,8 @@ void clearStats() {
 void printHelp() {
     Serial.println(F("--- NMX passive tap sniffer commands ---"));
     Serial.println(F("  help                 이 도움말"));
-    Serial.println(F("  raw on|off           수신 바이트 raw hex 출력"));
+    Serial.println(F("  menu                 설정 메뉴 다시 출력"));
+    Serial.println(F("  raw on|off           수신 바이트 raw hex 출력 (무효 바이트 포함)"));
     Serial.println(F("  frame on|off         6바이트 프레임 파서 출력"));
     Serial.println(F("  dir                  포트-방향 매핑 및 판정 근거"));
     Serial.println(F("  dir auto             헤더 바이트로 자동 판정 (기본)"));
@@ -545,6 +546,7 @@ void printHelp() {
     Serial.println(F("  pins                 현재 RX 핀 / 보레이트 / 형식"));
     Serial.println(F("  selftest             문서 예제로 디코더 검증"));
     Serial.println();
+    Serial.println(F("  엔터만 누르면 이 메뉴를 다시 출력한다."));
     Serial.println(F("  송신 명령은 없다. RX 전용이라 하드웨어적으로 송신할 수 없다."));
 }
 
@@ -984,7 +986,7 @@ void handleCommand(char* line) {
         *p = static_cast<char>(tolower(static_cast<unsigned char>(*p)));
     }
 
-    if (strcmp(cmd, "help") == 0 || strcmp(cmd, "?") == 0) {
+    if (strcmp(cmd, "help") == 0 || strcmp(cmd, "?") == 0 || strcmp(cmd, "menu") == 0) {
         printHelp();
         return;
     }
@@ -1081,8 +1083,10 @@ void pumpConsole() {
             continue;
         }
         if (c == '\n') {
-            g_cmdLine[g_cmdLen] = '\0';
-            if (g_cmdLen > 0) {
+            if (g_cmdLen == 0) {
+                printHelp();
+            } else {
+                g_cmdLine[g_cmdLen] = '\0';
                 handleCommand(g_cmdLine);
             }
             g_cmdLen = 0;
