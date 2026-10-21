@@ -40,6 +40,20 @@
 #define MAIN_TX_PIN 27  // Serial2 TX  -> MAX3232 #2  -> 본체 RxD
 #endif
 
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+#define NMX_C3_TARGET 1
+#else
+#define NMX_C3_TARGET 0
+#endif
+
+#if NMX_C3_TARGET
+#define NMX_CTRL_SERIAL &Serial1
+#define NMX_MAIN_SERIAL &Serial
+#else
+#define NMX_CTRL_SERIAL &Serial1
+#define NMX_MAIN_SERIAL &Serial2
+#endif
+
 // ---------------------------------------------------------------- 동작 상수
 namespace {
 
@@ -103,8 +117,8 @@ struct Direction {
 };
 
 Direction g_dir[2] = {
-    {&Serial1, &Serial2, "CTRL->MAIN"},
-    {&Serial2, &Serial1, "MAIN->CTRL"},
+    {NMX_CTRL_SERIAL, NMX_MAIN_SERIAL, "CTRL->MAIN"},
+    {NMX_MAIN_SERIAL, NMX_CTRL_SERIAL, "MAIN->CTRL"},
 };
 
 bool g_relayEnabled = true;  // 기본 ON. 끄면 장비 통신이 끊긴다.
@@ -371,10 +385,17 @@ void printHelp() {
 }
 
 void printPins() {
+#if NMX_C3_TARGET
+    Serial.printf("Serial1 (컨트롤러측) RX=GPIO%d TX=GPIO%d\n", CTRL_RX_PIN, CTRL_TX_PIN);
+    Serial.printf("Serial  (본체측)     RX=GPIO%d TX=GPIO%d\n", MAIN_RX_PIN, MAIN_TX_PIN);
+    Serial.printf("relay: Serial1 RX -> Serial TX (%s), Serial RX -> Serial1 TX (%s)\n",
+                  g_dir[0].tag, g_dir[1].tag);
+#else
     Serial.printf("Serial1 (컨트롤러측) RX=GPIO%d TX=GPIO%d\n", CTRL_RX_PIN, CTRL_TX_PIN);
     Serial.printf("Serial2 (본체측)     RX=GPIO%d TX=GPIO%d\n", MAIN_RX_PIN, MAIN_TX_PIN);
     Serial.printf("relay: Serial1 RX -> Serial2 TX (%s), Serial2 RX -> Serial1 TX (%s)\n",
                   g_dir[0].tag, g_dir[1].tag);
+#endif
     Serial.printf("baud=%u 8N1, debug baud=%u\n", static_cast<unsigned>(nmx::NMX_BAUD),
                   static_cast<unsigned>(nmx::DEBUG_BAUD));
 }
@@ -554,11 +575,11 @@ void handleCommand(char* line) {
         return;
     }
     if (strcmp(cmd, "sendmain") == 0) {
-        handleSend(&Serial2, "MAIN", save);
+        handleSend(NMX_MAIN_SERIAL, "MAIN", save);
         return;
     }
     if (strcmp(cmd, "sendctrl") == 0) {
-        handleSend(&Serial1, "CTRL", save);
+        handleSend(NMX_CTRL_SERIAL, "CTRL", save);
         return;
     }
 
@@ -605,9 +626,15 @@ void setup() {
     digitalWrite(MAIN_TX_PIN, HIGH);
 
     Serial1.setRxBufferSize(NMX_RX_BUFFER);
+#if NMX_C3_TARGET
+    Serial.setRxBufferSize(NMX_RX_BUFFER);
+    Serial1.begin(nmx::NMX_BAUD, SERIAL_8N1, CTRL_RX_PIN, CTRL_TX_PIN);
+    Serial.begin(nmx::NMX_BAUD, SERIAL_8N1, MAIN_RX_PIN, MAIN_TX_PIN);
+#else
     Serial2.setRxBufferSize(NMX_RX_BUFFER);
     Serial1.begin(nmx::NMX_BAUD, SERIAL_8N1, CTRL_RX_PIN, CTRL_TX_PIN);
     Serial2.begin(nmx::NMX_BAUD, SERIAL_8N1, MAIN_RX_PIN, MAIN_TX_PIN);
+#endif
 
     delay(200);
     Serial.println();

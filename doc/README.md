@@ -29,14 +29,40 @@ NMX-1108의 공식 프로토콜 자료는 없다. 6채널 모델인 **NMX-1106 �
 
 | 항목 | 값 |
 |---|---|
-| 개발 보드 | ESP32 38-pin 개발보드 |
+| 개발 보드 | ESP32 38-pin 개발보드 / ESP32-C3 Super Mini |
 | IDE / 빌드 | Visual Studio Code + PlatformIO |
 | Framework | Arduino |
-| 빌드 환경 | `esp32dev` 하나 |
+| 빌드 환경 | `esp32dev`, `esp32c3supermini` |
 | PC 디버깅 | `Serial` / UART0, 115200 bps (USB) |
-| 컨트롤러측 | `Serial1`, 9600 8N1 |
-| 본체측 | `Serial2`, 9600 8N1 |
+| 컨트롤러측 | `Serial1` (ESP32 Classic), `Serial1` (ESP32-C3) |
+| 본체측 | `Serial2` (ESP32 Classic), `Serial` (ESP32-C3) |
 | 레벨 변환 | MAX3232 모듈 2개 |
+
+`esp32c3supermini` 타깃은 기본 라우팅을 유지한 상태로 단일 3.3V C3 보드에서도 같은 중계 로직을 빌드할 수 있게 구성한다.
+
+### ESP32-C3 Super Mini 사용 핀
+
+ESP32-C3는 ESP32 Classic처럼 `Serial2` 객체가 없으므로,
+본체 쪽은 `Serial` 객체를 그대로 사용하고, 컨트롤러 쪽은 `Serial1`을 사용한다.
+`platformio.ini` 에는 아래와 같이 고정되어 있다.
+
+| 용도 | ESP32-C3 GPIO | UART | 연결 대상 |
+|---|---:|---|---|
+| 컨트롤러 RX | GPIO2 | `Serial1` RX | MAX3232 #1 TTL 출력 |
+| 컨트롤러 TX | GPIO3 | `Serial1` TX | MAX3232 #1 TTL 입력 |
+| 본체 RX | GPIO20 | `Serial` RX | MAX3232 #2 TTL 출력 |
+| 본체 TX | GPIO21 | `Serial` TX | MAX3232 #2 TTL 입력 |
+
+이 배치는 [../platformio.ini](../platformio.ini) 의 `esp32c3supermini` 타깃에서 설정되며,
+필요하면 `-DCTRL_RX_PIN=...` 와 같은 식으로 덮어써 재배선할 수 있다.
+
+> 참고: 많은 ESP32-C3 Super Mini 보드에서 GPIO18/19는 외부 핀으로 노출되지 않거나
+> 개별 보드마다 다르다. 실제 보드는 보드 실크/핀이 나와 있는 자리만 확인하고,
+> 이것이 아니라면 `GPIO20/21` 또는 다른 노출된 UART 핀으로 재매핑해야 한다.
+>
+> 중요한 점: ESP32-C3 Super Mini는 3.3V 보드라서 MAX3232 TTL 측과 직접 연결할 때는
+> 3.3V 레벨을 맞춘 전원/신호 조건을 유지해야 한다. RS-232C 전압은 그대로 MAX3232를 통과시켜
+> ESP32 GPIO에 직접 닿지 않도록 해야 한다.
 
 통신 조건은 NMX-1106 문서 기준 `9600 bps, 1 stop bit` 다.
 데이터 비트와 패리티는 문서에 명시가 없어 **`8N1` 로 가정**했다
@@ -55,6 +81,10 @@ pio device monitor     # 115200 bps
 
 ESP32가 두 장비 사이의 통로가 된다. 각 방향마다 MAX3232를 하나씩 쓰고,
 **RX와 TX를 모두** 연결한다.
+
+ESP32-C3 Super Mini는 ESP32 Classic과 UART 객체 구조가 다르므로,
+컨트롤러 쪽은 `Serial1`, 본체 쪽은 `Serial` 로 구분해 사용한다.
+이 배선은 아래 표의 C3용 핀값을 그대로 따른다.
 
 > **먼저 짚어둘 것.** 아래 그림에서 `┊ 펌웨어 ┊` 로 이어진 부분은 **전선이 아니다.**
 > ESP32가 한쪽 UART에서 읽은 바이트를 다른 쪽 UART로 써 보내는 **소프트웨어 동작**이다.
